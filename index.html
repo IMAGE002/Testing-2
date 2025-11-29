@@ -550,16 +550,18 @@
         // Add Almaty location markers after map loads
         addAlmatyMarkers();
         
-        // Update context based on view
-        updateContextBasedOnView();
+        // Update context based on view after a short delay to ensure map is ready
+        setTimeout(() => {
+          updateContextBasedOnView();
+        }, 500);
       });
 
       // Listen to map movements to update context
-      map.on('moveend', () => {
+      map.on('move', () => {
         updateContextBasedOnView();
       });
 
-      map.on('zoomend', () => {
+      map.on('zoom', () => {
         updateContextBasedOnView();
       });
 
@@ -578,25 +580,41 @@
       const sw = bounds.getSouthWest();
       const ne = bounds.getNorthEast();
       
+      console.log('Current view:', { sw: [sw.lng, sw.lat], ne: [ne.lng, ne.lat], zoom });
+      
       // Check which cities are in view
       const citiesInView = worldCities.filter(city => {
         const cityBounds = city.bounds;
+        // Check if city bounds overlap with view bounds
         const cityInView = (
-          sw.lng < cityBounds[1][0] && ne.lng > cityBounds[0][0] &&
-          sw.lat < cityBounds[1][1] && ne.lat > cityBounds[0][1]
+          ne.lng > cityBounds[0][0] && sw.lng < cityBounds[1][0] &&
+          ne.lat > cityBounds[0][1] && sw.lat < cityBounds[1][1]
         );
+        if (cityInView) {
+          console.log('City in view:', city.name);
+        }
         return cityInView;
       });
 
+      console.log('Cities in view:', citiesInView.length, citiesInView.map(c => c.name));
+
       // Update header based on view
-      if (citiesInView.length === 0 || zoom < 5) {
-        // World view
+      if (zoom < 4) {
+        // World view - zoomed out
+        console.log('Switching to world view (zoom < 4)');
+        updateHeader('World', worldStats.population, worldStats.altitude, worldStats.locations);
+        updateSidebar('world');
+        currentContext = 'world';
+      } else if (citiesInView.length === 0) {
+        // No specific city in view
+        console.log('No cities in view, showing world');
         updateHeader('World', worldStats.population, worldStats.altitude, worldStats.locations);
         updateSidebar('world');
         currentContext = 'world';
       } else if (citiesInView.length === 1) {
         // Single city view
         const city = citiesInView[0];
+        console.log('Single city view:', city.name);
         updateHeader(city.name, city.population, city.altitude, city.locations);
         
         if (city.name === 'Almaty') {
@@ -607,7 +625,8 @@
           currentContext = 'city';
         }
       } else {
-        // Multiple cities or regional view
+        // Multiple cities in view
+        console.log('Multiple cities in view, showing world');
         updateHeader('World', worldStats.population, worldStats.altitude, worldStats.locations);
         updateSidebar('world');
         currentContext = 'world';
